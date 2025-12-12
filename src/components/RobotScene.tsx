@@ -4,17 +4,19 @@ import { OrbitControls } from '@react-three/drei';
 import type { RobotCoordinates } from '@/lib/api';
 import { RobotModel } from './3d/RobotModel';
 import { CartesianCube } from './3d/CartesianCube';
+import { RobotTrail } from './3d/RobotTrail';
 import { Button } from './ui/button';
-import { Hand, Footprints } from 'lucide-react';
+import { Hand, Footprints, Sparkles } from 'lucide-react';
 
 interface SceneProps {
   robotPosition: [number, number, number];
   onRobotMove: (pos: [number, number, number]) => void;
   isWaving: boolean;
   isWalking: boolean;
+  showTrail: boolean;
 }
 
-function Scene({ robotPosition, onRobotMove, isWaving, isWalking }: SceneProps) {
+function Scene({ robotPosition, onRobotMove, isWaving, isWalking, showTrail }: SceneProps) {
   return (
     <>
       <ambientLight intensity={0.5} />
@@ -22,6 +24,7 @@ function Scene({ robotPosition, onRobotMove, isWaving, isWalking }: SceneProps) 
       <pointLight position={[-3, 3, -3]} intensity={0.3} />
       
       <CartesianCube />
+      {showTrail && <RobotTrail position={robotPosition} />}
       <RobotModel 
         position={robotPosition} 
         onPositionChange={onRobotMove}
@@ -49,6 +52,7 @@ interface RobotSceneProps {
 export function RobotScene({ coordinates, onCoordinatesChange, className }: RobotSceneProps) {
   const [isWaving, setIsWaving] = useState(false);
   const [isWalking, setIsWalking] = useState(false);
+  const [showTrail, setShowTrail] = useState(true);
 
   // Convert 0-255 coordinates to 0-1 for Three.js
   const robotPosition: [number, number, number] = [
@@ -78,6 +82,7 @@ export function RobotScene({ coordinates, onCoordinatesChange, className }: Robo
               onRobotMove={handleRobotMove}
               isWaving={isWaving}
               isWalking={isWalking}
+              showTrail={showTrail}
             />
           </Suspense>
         </Canvas>
@@ -101,6 +106,15 @@ export function RobotScene({ coordinates, onCoordinatesChange, className }: Robo
           >
             <Footprints className="h-4 w-4" />
             {isWalking ? 'Stop Walking' : 'Walk'}
+          </Button>
+          <Button
+            variant={showTrail ? "default" : "outline"}
+            size="sm"
+            onClick={() => setShowTrail(!showTrail)}
+            className="gap-2"
+          >
+            <Sparkles className="h-4 w-4" />
+            {showTrail ? 'Hide Trail' : 'Show Trail'}
           </Button>
         </div>
 
