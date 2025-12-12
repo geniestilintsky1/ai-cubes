@@ -59,16 +59,33 @@ export function RobotModel({ position, onPositionChange, isWaving, isWalking }: 
     }
   });
 
-  // Keyboard controls for Y-axis
+  // Keyboard controls for all axes
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const step = 0.02;
+      let [x, y, z] = position;
+      
+      // Y-axis: W/S or Up/Down arrows
       if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
-        const newY = Math.min(1, position[1] + step);
-        onPositionChange([position[0], newY, position[2]]);
+        y = Math.min(1, y + step);
       } else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') {
-        const newY = Math.max(0, position[1] - step);
-        onPositionChange([position[0], newY, position[2]]);
+        y = Math.max(0, y - step);
+      }
+      // X-axis: A/D or Left/Right arrows
+      else if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+        x = Math.max(0, x - step);
+      } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+        x = Math.min(1, x + step);
+      }
+      // Z-axis: Q/E
+      else if (e.key === 'q' || e.key === 'Q') {
+        z = Math.max(0, z - step);
+      } else if (e.key === 'e' || e.key === 'E') {
+        z = Math.min(1, z + step);
+      }
+      
+      if (x !== position[0] || y !== position[1] || z !== position[2]) {
+        onPositionChange([x, y, z]);
       }
     };
 

@@ -119,8 +119,10 @@ export function RobotScene({ coordinates, onCoordinatesChange, className }: Robo
         </div>
 
         {/* Keyboard hint */}
-        <div className="absolute bottom-4 right-4 bg-background/80 backdrop-blur-sm rounded-lg px-3 py-2 text-xs text-muted-foreground">
-          <span className="font-medium">↑/W</span> Up · <span className="font-medium">↓/S</span> Down
+        <div className="absolute bottom-4 right-4 bg-background/80 backdrop-blur-sm rounded-lg px-3 py-2 text-xs text-muted-foreground space-y-1">
+          <div><span className="font-medium">←/A</span> · <span className="font-medium">→/D</span> X-axis</div>
+          <div><span className="font-medium">↑/W</span> · <span className="font-medium">↓/S</span> Y-axis</div>
+          <div><span className="font-medium">Q</span> · <span className="font-medium">E</span> Z-axis</div>
         </div>
       </div>
     </div>
