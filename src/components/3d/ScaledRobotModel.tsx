@@ -1,6 +1,7 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
+import { getSoilTypeAtPosition, SOIL_ZONES, type SoilType } from './SoilZones';
 
 interface ScaledRobotModelProps {
   position: [number, number, number];
@@ -8,6 +9,7 @@ interface ScaledRobotModelProps {
   isWaving: boolean;
   isWalking: boolean;
   cubeSize?: number;
+  onSoilTypeChange?: (soilType: SoilType, speedMultiplier: number) => void;
 }
 
 export function ScaledRobotModel({ 
@@ -15,7 +17,8 @@ export function ScaledRobotModel({
   onPositionChange, 
   isWaving, 
   isWalking,
-  cubeSize = 2 
+  cubeSize = 2,
+  onSoilTypeChange
 }: ScaledRobotModelProps) {
   const groupRef = useRef<THREE.Group>(null);
   const leftArmRef = useRef<THREE.Mesh>(null);
@@ -71,10 +74,26 @@ export function ScaledRobotModel({
     }
   });
 
-  // Keyboard controls for all axes
+  // Track current soil type and notify parent
+  useEffect(() => {
+    const soilType = getSoilTypeAtPosition(position[0], position[2]);
+    const config = SOIL_ZONES[soilType];
+    onSoilTypeChange?.(soilType, config.speedMultiplier);
+  }, [position[0], position[2], onSoilTypeChange]);
+
+  // Get current speed multiplier based on soil
+  const getCurrentSpeedMultiplier = useCallback(() => {
+    const soilType = getSoilTypeAtPosition(position[0], position[2]);
+    return SOIL_ZONES[soilType].speedMultiplier;
+  }, [position]);
+
+  // Keyboard controls for all axes with soil-based speed
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const step = 0.02;
+      const baseStep = 0.02;
+      const speedMultiplier = getCurrentSpeedMultiplier();
+      const step = baseStep * speedMultiplier;
+      
       let [x, y, z] = position;
       
       // Y-axis: W/S or Up/Down arrows
@@ -103,7 +122,7 @@ export function ScaledRobotModel({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [position, onPositionChange]);
+  }, [position, onPositionChange, getCurrentSpeedMultiplier]);
 
   const handlePointerDown = useCallback((e: { stopPropagation: () => void }) => {
     e.stopPropagation();

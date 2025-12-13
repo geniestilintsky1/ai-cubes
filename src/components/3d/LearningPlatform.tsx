@@ -1,12 +1,16 @@
 import { Grid, Text } from '@react-three/drei';
 import * as THREE from 'three';
+import { SoilZonePlatform } from './SoilZones';
 
 interface LearningPlatformProps {
   size?: number;
+  showSoilZones?: boolean;
 }
 
 // A raised platform where the Cartesian learning happens
-export function LearningPlatform({ size = 3 }: LearningPlatformProps) {
+export function LearningPlatform({ size = 3, showSoilZones = true }: LearningPlatformProps) {
+  const cubeSize = 2;
+  
   return (
     <group position={[0, -1.5, 0]}>
       {/* Main platform base */}
@@ -19,29 +23,34 @@ export function LearningPlatform({ size = 3 }: LearningPlatformProps) {
         />
       </mesh>
       
-      {/* Platform top surface */}
-      <mesh receiveShadow position={[0, 0.01, 0]}>
-        <cylinderGeometry args={[size * 0.95, size * 0.95, 0.02, 32]} />
-        <meshStandardMaterial
-          color="#e2e8f0"
-          roughness={0.2}
-          metalness={0.2}
-        />
-      </mesh>
+      {/* Platform top surface - only show if no soil zones */}
+      {!showSoilZones && (
+        <mesh receiveShadow position={[0, 0.01, 0]}>
+          <cylinderGeometry args={[size * 0.95, size * 0.95, 0.02, 32]} />
+          <meshStandardMaterial
+            color="#e2e8f0"
+            roughness={0.2}
+            metalness={0.2}
+          />
+        </mesh>
+      )}
 
-      {/* Cartesian grid on platform */}
+      {/* Soil zones on the platform */}
+      {showSoilZones && <SoilZonePlatform size={cubeSize} />}
+
+      {/* Cartesian grid on platform - reduced opacity when soil zones visible */}
       <Grid
         args={[size * 1.8, size * 1.8]}
         cellSize={0.25}
         cellThickness={0.5}
-        cellColor="#94a3b8"
+        cellColor={showSoilZones ? "#ffffff" : "#94a3b8"}
         sectionSize={0.5}
         sectionThickness={1}
-        sectionColor="#64748b"
+        sectionColor={showSoilZones ? "#ffffff" : "#64748b"}
         fadeDistance={10}
         fadeStrength={1}
         followCamera={false}
-        position={[0, 0.02, 0]}
+        position={[0, showSoilZones ? 0.03 : 0.02, 0]}
       />
 
       {/* Glowing rim */}

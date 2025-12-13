@@ -5,6 +5,7 @@ import type { RobotCoordinates } from '@/lib/api';
 import { ScaledRobotModel } from './3d/ScaledRobotModel';
 import { ScaledRobotTrail } from './3d/ScaledRobotTrail';
 import { LearningPlatform, ScaledCartesianCube } from './3d/LearningPlatform';
+import { SOIL_ZONES, type SoilType } from './3d/SoilZones';
 import {
   Terrain,
   DistantMountains,
@@ -16,7 +17,7 @@ import {
   AtmosphericParticles,
 } from './3d/Environment';
 import { Button } from './ui/button';
-import { Hand, Footprints, Sparkles, Camera, RotateCcw } from 'lucide-react';
+import { Hand, Footprints, Sparkles, Camera, Layers } from 'lucide-react';
 
 interface SceneProps {
   robotPosition: [number, number, number];
@@ -24,9 +25,19 @@ interface SceneProps {
   isWaving: boolean;
   isWalking: boolean;
   showTrail: boolean;
+  showSoilZones: boolean;
+  onSoilTypeChange: (soilType: SoilType, speedMultiplier: number) => void;
 }
 
-function Scene({ robotPosition, onRobotMove, isWaving, isWalking, showTrail }: SceneProps) {
+function Scene({ 
+  robotPosition, 
+  onRobotMove, 
+  isWaving, 
+  isWalking, 
+  showTrail,
+  showSoilZones,
+  onSoilTypeChange
+}: SceneProps) {
   return (
     <>
       {/* Atmospheric effects */}
@@ -44,7 +55,7 @@ function Scene({ robotPosition, onRobotMove, isWaving, isWalking, showTrail }: S
       <GroundDetails />
       
       {/* Foreground - Learning area */}
-      <LearningPlatform size={3} />
+      <LearningPlatform size={3} showSoilZones={showSoilZones} />
       <ScaledCartesianCube />
       
       {/* Robot and trail */}
@@ -55,6 +66,7 @@ function Scene({ robotPosition, onRobotMove, isWaving, isWalking, showTrail }: S
         isWaving={isWaving}
         isWalking={isWalking}
         cubeSize={2}
+        onSoilTypeChange={onSoilTypeChange}
       />
       
       <OrbitControls 
@@ -85,7 +97,10 @@ export function EducationalRobotScene({
   const [isWaving, setIsWaving] = useState(false);
   const [isWalking, setIsWalking] = useState(false);
   const [showTrail, setShowTrail] = useState(true);
+  const [showSoilZones, setShowSoilZones] = useState(true);
   const [cameraPreset, setCameraPreset] = useState<'default' | 'top' | 'front'>('default');
+  const [currentSoilType, setCurrentSoilType] = useState<SoilType>('good');
+  const [speedMultiplier, setSpeedMultiplier] = useState(1);
 
   // Convert 0-255 coordinates to 0-1 for Three.js
   const robotPosition: [number, number, number] = [
@@ -102,6 +117,11 @@ export function EducationalRobotScene({
     });
   }, [onCoordinatesChange]);
 
+  const handleSoilTypeChange = useCallback((soilType: SoilType, speed: number) => {
+    setCurrentSoilType(soilType);
+    setSpeedMultiplier(speed);
+  }, []);
+
   const getCameraPosition = (): [number, number, number] => {
     switch (cameraPreset) {
       case 'top':
@@ -112,6 +132,8 @@ export function EducationalRobotScene({
         return [6, 4, 6];
     }
   };
+
+  const soilConfig = SOIL_ZONES[currentSoilType];
 
   return (
     <div className={className}>
@@ -138,6 +160,8 @@ export function EducationalRobotScene({
               isWaving={isWaving}
               isWalking={isWalking}
               showTrail={showTrail}
+              showSoilZones={showSoilZones}
+              onSoilTypeChange={handleSoilTypeChange}
             />
           </Suspense>
         </Canvas>
@@ -170,6 +194,15 @@ export function EducationalRobotScene({
           >
             <Sparkles className="h-4 w-4" />
             Trail
+          </Button>
+          <Button
+            variant={showSoilZones ? "default" : "outline"}
+            size="sm"
+            onClick={() => setShowSoilZones(!showSoilZones)}
+            className="gap-2 bg-background/80 backdrop-blur-sm"
+          >
+            <Layers className="h-4 w-4" />
+            Soil
           </Button>
         </div>
 
@@ -213,13 +246,54 @@ export function EducationalRobotScene({
           </div>
         </div>
 
-        {/* Depth indicator */}
-        <div className="absolute top-4 right-4 bg-background/80 backdrop-blur-sm rounded-lg px-3 py-2 text-xs">
-          <div className="text-muted-foreground">Position</div>
-          <div className="font-mono text-foreground">
-            X: {coordinates.x} | Y: {coordinates.y} | Z: {coordinates.z}
+        {/* Position & Soil indicator */}
+        <div className="absolute top-4 right-4 bg-background/80 backdrop-blur-sm rounded-lg px-3 py-2 text-xs space-y-2">
+          <div>
+            <div className="text-muted-foreground">Position</div>
+            <div className="font-mono text-foreground">
+              X: {coordinates.x} | Y: {coordinates.y} | Z: {coordinates.z}
+            </div>
           </div>
+          
+          {showSoilZones && (
+            <div className="pt-2 border-t border-border">
+              <div className="text-muted-foreground">Current Zone</div>
+              <div className="flex items-center gap-2 mt-1">
+                <div 
+                  className="w-3 h-3 rounded-full" 
+                  style={{ backgroundColor: soilConfig.color }}
+                />
+                <span className="font-medium text-foreground">{soilConfig.name}</span>
+              </div>
+              <div className="text-muted-foreground mt-1">
+                Speed: {Math.round(speedMultiplier * 100)}% • {soilConfig.description}
+              </div>
+            </div>
+          )}
         </div>
+
+        {/* Soil Zone Legend */}
+        {showSoilZones && (
+          <div className="absolute top-20 right-4 bg-background/80 backdrop-blur-sm rounded-lg px-3 py-2 text-xs">
+            <div className="font-medium text-foreground mb-2">Soil Zones</div>
+            <div className="space-y-1">
+              {Object.values(SOIL_ZONES).map((zone) => (
+                <div key={zone.type} className="flex items-center gap-2">
+                  <div 
+                    className="w-2.5 h-2.5 rounded-sm" 
+                    style={{ backgroundColor: zone.color }}
+                  />
+                  <span className={currentSoilType === zone.type ? 'text-foreground font-medium' : 'text-muted-foreground'}>
+                    {zone.name}
+                  </span>
+                  <span className="text-muted-foreground/60">
+                    {Math.round(zone.speedMultiplier * 100)}%
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
