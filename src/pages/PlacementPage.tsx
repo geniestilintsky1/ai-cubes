@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Check, ArrowLeft, ArrowRight, Move3D } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Layout } from '@/components/Layout';
-import { RobotScene } from '@/components/RobotScene';
+import { EducationalRobotScene } from '@/components/EducationalRobotScene';
 import { AxisIndicator } from '@/components/AxisIndicator';
 import { useSession } from '@/context/SessionContext';
 import { sendRobotCoordinates } from '@/lib/api';
@@ -51,10 +51,10 @@ const PlacementPage = () => {
 
           {/* 3D Scene */}
           <div className="rounded-2xl border border-border overflow-hidden bg-card shadow-lg mb-6">
-            <RobotScene
+            <EducationalRobotScene
               coordinates={state.robotCoordinates}
               onCoordinatesChange={setRobotCoordinates}
-              className="w-full h-[400px] md:h-[500px]"
+              className="w-full h-[500px] md:h-[600px]"
             />
           </div>
 
