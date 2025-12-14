@@ -1,33 +1,57 @@
 import { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Sky, Cloud, Environment as DreiEnvironment } from '@react-three/drei';
+import { Sky, Cloud } from '@react-three/drei';
 import * as THREE from 'three';
+import { getSunPositionFromHour, calculateSunlightExposure } from './SunlightSystem';
 
-export function Terrain() {
+interface TerrainProps {
+  hour?: number;
+}
+
+export function Terrain({ hour = 12 }: TerrainProps) {
   const meshRef = useRef<THREE.Mesh>(null);
+  const sunY = useMemo(() => getSunPositionFromHour(hour)[1], [hour]);
 
-  // Generate terrain geometry with height variations
+  // Generate terrain geometry with height variations and elevation-based coloring
   const geometry = useMemo(() => {
     const geo = new THREE.PlaneGeometry(100, 100, 128, 128);
     const positions = geo.attributes.position.array as Float32Array;
+    const colors = new Float32Array(positions.length);
     
-    // Create gentle rolling hills
+    // Create varied terrain with distinct elevation zones
     for (let i = 0; i < positions.length; i += 3) {
       const x = positions[i];
       const y = positions[i + 1];
       
-      // Multiple octaves of noise for natural terrain
+      // Multiple octaves of noise for natural terrain with larger hills
       const height = 
-        Math.sin(x * 0.05) * Math.cos(y * 0.05) * 0.8 +
-        Math.sin(x * 0.1 + 1) * Math.cos(y * 0.08) * 0.4 +
-        Math.sin(x * 0.2) * Math.cos(y * 0.15) * 0.2;
+        Math.sin(x * 0.04) * Math.cos(y * 0.04) * 2.0 +
+        Math.sin(x * 0.08 + 1) * Math.cos(y * 0.06) * 1.0 +
+        Math.sin(x * 0.15) * Math.cos(y * 0.12) * 0.5 +
+        Math.sin(x * 0.02 + y * 0.015) * 3.0; // Large rolling hills
       
       positions[i + 2] = height;
+      
+      // Calculate normalized elevation (approx -4 to +6 range)
+      const normalizedElevation = (height + 4) / 10;
+      
+      // Sunlight exposure based on elevation
+      const exposure = calculateSunlightExposure(normalizedElevation, sunY);
+      
+      // Color gradient: low = darker green, high = lighter/yellower
+      const r = (0.15 + normalizedElevation * 0.25) * exposure;
+      const g = (0.55 - normalizedElevation * 0.15) * exposure;
+      const b = 0.12 * exposure;
+      
+      colors[i] = Math.min(1, r);
+      colors[i + 1] = Math.min(1, g);
+      colors[i + 2] = Math.min(1, b);
     }
     
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     geo.computeVertexNormals();
     return geo;
-  }, []);
+  }, [sunY]);
 
   return (
     <mesh
@@ -38,9 +62,9 @@ export function Terrain() {
       receiveShadow
     >
       <meshStandardMaterial
-        color="#4ade80"
-        roughness={0.9}
-        metalness={0.1}
+        vertexColors
+        roughness={0.85}
+        metalness={0.05}
         flatShading
       />
     </mesh>
@@ -82,13 +106,34 @@ export function DistantMountains() {
   );
 }
 
-export function AtmosphericLighting() {
+// Legacy lighting - now using DynamicSun from SunlightSystem
+export function AtmosphericLighting({ hour = 12 }: { hour?: number }) {
+  const sunPosition = useMemo(() => getSunPositionFromHour(hour), [hour]);
+  const sunY = sunPosition[1];
+  
+  // Dynamic intensity based on sun position
+  const intensity = useMemo(() => {
+    if (sunY < 0) return 0.2;
+    return 0.4 + (sunY / 100) * 1.2;
+  }, [sunY]);
+
+  // Dynamic colors based on time
+  const colors = useMemo(() => {
+    if (sunY < 0) {
+      return { sun: '#6366f1', ambient: '#1e1b4b', ground: '#0f172a' };
+    } else if (sunY < 30) {
+      return { sun: '#fb923c', ambient: '#fef3c7', ground: '#4ade80' };
+    }
+    return { sun: '#fef08a', ambient: '#87CEEB', ground: '#4ade80' };
+  }, [sunY]);
+
   return (
     <>
       {/* Main sun light */}
       <directionalLight
-        position={[50, 80, 30]}
-        intensity={1.5}
+        position={sunPosition}
+        intensity={intensity}
+        color={colors.sun}
         castShadow
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
@@ -97,57 +142,75 @@ export function AtmosphericLighting() {
         shadow-camera-right={50}
         shadow-camera-top={50}
         shadow-camera-bottom={-50}
+        shadow-bias={-0.0001}
       />
       
       {/* Ambient sky light */}
-      <ambientLight intensity={0.4} color="#87CEEB" />
+      <ambientLight intensity={intensity * 0.3} color={colors.ambient} />
       
       {/* Ground bounce light */}
       <hemisphereLight
-        args={['#87CEEB', '#4ade80', 0.5]}
+        args={[colors.ambient, colors.ground, intensity * 0.4]}
       />
       
       {/* Rim light for depth */}
       <directionalLight
-        position={[-30, 20, -30]}
-        intensity={0.3}
-        color="#f0abfc"
+        position={[-sunPosition[0], sunPosition[1] * 0.3, -sunPosition[2]]}
+        intensity={intensity * 0.2}
+        color="#a78bfa"
       />
     </>
   );
 }
 
-export function AtmosphericSky() {
+export function AtmosphericSky({ hour = 12 }: { hour?: number }) {
+  const sunPosition = useMemo(() => getSunPositionFromHour(hour), [hour]);
+  const sunY = sunPosition[1];
+  
+  // Sky parameters based on sun position
+  const skyParams = useMemo(() => {
+    if (sunY < 0) {
+      return { turbidity: 1, rayleigh: 0.2, mieCoefficient: 0.001 };
+    } else if (sunY < 30) {
+      return { turbidity: 10, rayleigh: 3, mieCoefficient: 0.05 };
+    }
+    return { turbidity: 8, rayleigh: 0.5, mieCoefficient: 0.005 };
+  }, [sunY]);
+
   return (
     <>
       <Sky
         distance={450000}
-        sunPosition={[50, 80, 30]}
-        inclination={0.6}
-        azimuth={0.25}
-        rayleigh={0.5}
-        turbidity={8}
+        sunPosition={sunPosition}
+        turbidity={skyParams.turbidity}
+        rayleigh={skyParams.rayleigh}
+        mieCoefficient={skyParams.mieCoefficient}
+        mieDirectionalG={0.8}
       />
       
-      {/* Volumetric clouds */}
-      <Cloud
-        position={[-20, 25, -30]}
-        opacity={0.5}
-        speed={0.2}
-        segments={40}
-      />
-      <Cloud
-        position={[25, 30, -25]}
-        opacity={0.4}
-        speed={0.15}
-        segments={30}
-      />
-      <Cloud
-        position={[0, 35, 20]}
-        opacity={0.3}
-        speed={0.1}
-        segments={25}
-      />
+      {/* Volumetric clouds - fade at night */}
+      {sunY > 0 && (
+        <>
+          <Cloud
+            position={[-20, 25, -30]}
+            opacity={0.5}
+            speed={0.2}
+            segments={40}
+          />
+          <Cloud
+            position={[25, 30, -25]}
+            opacity={0.4}
+            speed={0.15}
+            segments={30}
+          />
+          <Cloud
+            position={[0, 35, 20]}
+            opacity={0.3}
+            speed={0.1}
+            segments={25}
+          />
+        </>
+      )}
     </>
   );
 }
@@ -200,10 +263,21 @@ interface FogEffectProps {
   near?: number;
   far?: number;
   color?: string;
+  hour?: number;
 }
 
-export function FogEffect({ near = 20, far = 80, color = '#e0f2fe' }: FogEffectProps) {
-  return <fog attach="fog" args={[color, near, far]} />;
+export function FogEffect({ near = 20, far = 80, color, hour = 12 }: FogEffectProps) {
+  const sunY = useMemo(() => getSunPositionFromHour(hour)[1], [hour]);
+  
+  // Dynamic fog color based on time if not specified
+  const fogColor = useMemo(() => {
+    if (color) return color;
+    if (sunY < 0) return '#1e293b'; // Night
+    if (sunY < 30) return '#fde68a'; // Dawn/dusk
+    return '#e0f2fe'; // Day
+  }, [color, sunY]);
+
+  return <fog attach="fog" args={[fogColor, near, far]} />;
 }
 
 // Trees for midground
