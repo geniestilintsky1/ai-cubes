@@ -19,11 +19,20 @@ import {
 import { 
   getSunPositionFromHour, 
   calculateSunlightExposure,
-  PlantGrowthZone,
   type TimeOfDay 
 } from './3d/SunlightSystem';
+import {
+  Plant,
+  PlantGarden,
+  calculatePlantHealth,
+  calculatePlantColor,
+  getHealthState,
+  getHealthSummary,
+  PLANT_HEALTH_STATES,
+  type PlantHealthState,
+} from './3d/PlantSystem';
 import { Button } from './ui/button';
-import { Hand, Footprints, Sparkles, Camera, Layers, Sun, Moon, Sunrise, Sunset } from 'lucide-react';
+import { Hand, Footprints, Sparkles, Camera, Layers, Sun, Moon, Sunrise, Sunset, Leaf } from 'lucide-react';
 import { Slider } from './ui/slider';
 
 interface SceneProps {
@@ -33,6 +42,7 @@ interface SceneProps {
   isWalking: boolean;
   showTrail: boolean;
   showSoilZones: boolean;
+  showPlants: boolean;
   hour: number;
   onSoilTypeChange: (soilType: SoilType, speedMultiplier: number) => void;
 }
@@ -44,23 +54,27 @@ function Scene({
   isWalking, 
   showTrail,
   showSoilZones,
+  showPlants,
   hour,
   onSoilTypeChange
 }: SceneProps) {
-  // Sample plants at different elevations to demonstrate sunlight effects
-  const plants = useMemo(() => {
-    const positions: { pos: [number, number, number]; elevation: number }[] = [
-      // Low elevation plants
-      { pos: [-3, -1.5, 3], elevation: 0.2 },
-      { pos: [-4, -1.5, 4], elevation: 0.15 },
-      // Medium elevation
-      { pos: [4, -1.3, 3], elevation: 0.4 },
-      { pos: [3, -1.35, 4], elevation: 0.35 },
-      // High elevation
-      { pos: [5, -0.8, -3], elevation: 0.7 },
-      { pos: [4, -0.9, -4], elevation: 0.65 },
+  // Sample plants on the learning platform - one in each soil zone
+  const platformPlants = useMemo(() => {
+    return [
+      // Wet zone (front-left) - different plant types
+      { pos: [-0.6, -1.48, -0.6] as [number, number, number], soil: 'wet' as SoilType, type: 'flower' as const, elevation: 0.3 },
+      { pos: [-0.3, -1.48, -0.4] as [number, number, number], soil: 'wet' as SoilType, type: 'basic' as const, elevation: 0.35 },
+      // Dry zone (front-right)
+      { pos: [0.6, -1.48, -0.6] as [number, number, number], soil: 'dry' as SoilType, type: 'crop' as const, elevation: 0.5 },
+      { pos: [0.3, -1.48, -0.4] as [number, number, number], soil: 'dry' as SoilType, type: 'basic' as const, elevation: 0.45 },
+      // Good soil zone (back-left)
+      { pos: [-0.6, -1.48, 0.6] as [number, number, number], soil: 'good' as SoilType, type: 'crop' as const, elevation: 0.6 },
+      { pos: [-0.3, -1.48, 0.4] as [number, number, number], soil: 'good' as SoilType, type: 'flower' as const, elevation: 0.55 },
+      { pos: [-0.5, -1.48, 0.3] as [number, number, number], soil: 'good' as SoilType, type: 'tree' as const, elevation: 0.65 },
+      // Bad soil zone (back-right)
+      { pos: [0.6, -1.48, 0.6] as [number, number, number], soil: 'bad' as SoilType, type: 'basic' as const, elevation: 0.4 },
+      { pos: [0.3, -1.48, 0.4] as [number, number, number], soil: 'bad' as SoilType, type: 'crop' as const, elevation: 0.35 },
     ];
-    return positions;
   }, []);
 
   return (
@@ -79,14 +93,17 @@ function Scene({
       <Trees />
       <GroundDetails />
       
-      {/* Sample plants showing sunlight effects on growth */}
-      {plants.map((plant, i) => (
-        <PlantGrowthZone
+      {/* Plants on the learning platform showing health based on soil/sun/elevation */}
+      {showPlants && platformPlants.map((plant, i) => (
+        <Plant
           key={i}
           position={plant.pos}
+          soilType={plant.soil}
           elevation={plant.elevation}
           hour={hour}
-          size={0.4}
+          plantType={plant.type}
+          baseSize={0.15}
+          showLabel={false}
         />
       ))}
       
@@ -137,10 +154,10 @@ export function EducationalRobotScene({
   const [cameraPreset, setCameraPreset] = useState<'default' | 'top' | 'front'>('default');
   const [currentSoilType, setCurrentSoilType] = useState<SoilType>('good');
   const [speedMultiplier, setSpeedMultiplier] = useState(1);
+  const [showPlants, setShowPlants] = useState(true);
   
   // Time of day system
   const [hour, setHour] = useState(12); // 0-24
-  const [isAnimatingTime, setIsAnimatingTime] = useState(false);
 
   // Convert 0-255 coordinates to 0-1 for Three.js
   const robotPosition: [number, number, number] = [
@@ -197,6 +214,15 @@ export function EducationalRobotScene({
     return calculateSunlightExposure(robotElevation, sunPosition[1]);
   }, [coordinates.y, sunPosition]);
 
+  // Plant health summary based on current conditions
+  const plantHealthSummary = useMemo(() => {
+    const elevation = coordinates.y / 255;
+    return getHealthSummary({ soilType: currentSoilType, elevation, hour });
+  }, [currentSoilType, coordinates.y, hour]);
+
+  const plantColor = useMemo(() => calculatePlantColor(plantHealthSummary.averageHealth), [plantHealthSummary.averageHealth]);
+  const healthConfig = PLANT_HEALTH_STATES[plantHealthSummary.healthState];
+
   const soilConfig = SOIL_ZONES[currentSoilType];
 
   return (
@@ -226,6 +252,7 @@ export function EducationalRobotScene({
               hour={hour}
               showTrail={showTrail}
               showSoilZones={showSoilZones}
+              showPlants={showPlants}
               onSoilTypeChange={handleSoilTypeChange}
             />
           </Suspense>
@@ -268,6 +295,15 @@ export function EducationalRobotScene({
           >
             <Layers className="h-4 w-4" />
             Soil
+          </Button>
+          <Button
+            variant={showPlants ? "default" : "outline"}
+            size="sm"
+            onClick={() => setShowPlants(!showPlants)}
+            className="gap-2 bg-background/80 backdrop-blur-sm"
+          >
+            <Leaf className="h-4 w-4" />
+            Plants
           </Button>
         </div>
 
@@ -419,14 +455,74 @@ export function EducationalRobotScene({
                 {Math.round(sunExposure * 100)}%
               </span>
             </div>
-            <div className="text-muted-foreground mt-1 text-[10px]">
-              {sunExposure < 0.5 
-                ? 'Low light - plants struggle' 
-                : sunExposure < 1 
-                  ? 'Moderate light - plants grow' 
-                  : 'High light - plants thrive'}
-            </div>
           </div>
+          
+          {/* Plant Health indicator */}
+          {showPlants && (
+            <div className="pt-2 border-t border-border">
+              <div className="text-muted-foreground">Plant Health (at position)</div>
+              <div className="flex items-center gap-2 mt-1">
+                <div 
+                  className="w-4 h-4 rounded-full border-2 border-background shadow-sm"
+                  style={{ backgroundColor: plantColor.hex }}
+                />
+                <span className="font-medium text-foreground capitalize">{plantHealthSummary.healthState}</span>
+                <span className="font-mono text-muted-foreground text-[10px]">
+                  {Math.round(plantHealthSummary.averageHealth * 100)}%
+                </span>
+              </div>
+              <div className="text-muted-foreground mt-1 text-[10px]">
+                {healthConfig.description}
+              </div>
+              
+              {/* RGB breakdown */}
+              <div className="mt-2 grid grid-cols-3 gap-1 text-[9px]">
+                <div className="flex items-center gap-1">
+                  <div className="w-2 h-2 rounded-full bg-red-500" />
+                  <span className="font-mono">{Math.round(plantColor.r * 255)}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-2 h-2 rounded-full bg-green-500" />
+                  <span className="font-mono">{Math.round(plantColor.g * 255)}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-2 h-2 rounded-full bg-blue-500" />
+                  <span className="font-mono">{Math.round(plantColor.b * 255)}</span>
+                </div>
+              </div>
+              
+              {/* Environmental factors breakdown */}
+              <div className="mt-2 space-y-1">
+                <div className="flex justify-between text-[9px]">
+                  <span>☀️ Sun</span>
+                  <div className="flex items-center gap-1">
+                    <div className="w-12 h-1.5 bg-muted rounded-full overflow-hidden">
+                      <div className="h-full bg-amber-400 rounded-full" style={{ width: `${Math.min(100, plantHealthSummary.sunlightLevel * 60)}%` }} />
+                    </div>
+                    <span className="font-mono w-6 text-right">{Math.round(plantHealthSummary.sunlightLevel * 100)}%</span>
+                  </div>
+                </div>
+                <div className="flex justify-between text-[9px]">
+                  <span>💧 Water</span>
+                  <div className="flex items-center gap-1">
+                    <div className="w-12 h-1.5 bg-muted rounded-full overflow-hidden">
+                      <div className="h-full bg-blue-400 rounded-full" style={{ width: `${plantHealthSummary.waterLevel * 100}%` }} />
+                    </div>
+                    <span className="font-mono w-6 text-right">{Math.round(plantHealthSummary.waterLevel * 100)}%</span>
+                  </div>
+                </div>
+                <div className="flex justify-between text-[9px]">
+                  <span>🌱 Soil</span>
+                  <div className="flex items-center gap-1">
+                    <div className="w-12 h-1.5 bg-muted rounded-full overflow-hidden">
+                      <div className="h-full bg-emerald-400 rounded-full" style={{ width: `${plantHealthSummary.soilQuality * 100}%` }} />
+                    </div>
+                    <span className="font-mono w-6 text-right">{Math.round(plantHealthSummary.soilQuality * 100)}%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Soil Zone Legend */}
