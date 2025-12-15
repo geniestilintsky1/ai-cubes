@@ -31,8 +31,13 @@ import {
   PLANT_HEALTH_STATES,
   type PlantHealthState,
 } from './3d/PlantSystem';
+import {
+  RobotScanner,
+  performFullScan,
+  type RobotScanResult,
+} from './3d/RobotScanner';
 import { Button } from './ui/button';
-import { Hand, Footprints, Sparkles, Camera, Layers, Sun, Moon, Sunrise, Sunset, Leaf } from 'lucide-react';
+import { Hand, Footprints, Sparkles, Camera, Layers, Sun, Moon, Sunrise, Sunset, Leaf, Scan, Activity, Radar } from 'lucide-react';
 import { Slider } from './ui/slider';
 
 interface SceneProps {
@@ -43,8 +48,10 @@ interface SceneProps {
   showTrail: boolean;
   showSoilZones: boolean;
   showPlants: boolean;
+  showScanner: boolean;
   hour: number;
   onSoilTypeChange: (soilType: SoilType, speedMultiplier: number) => void;
+  onScanComplete: (result: RobotScanResult) => void;
 }
 
 function Scene({ 
@@ -55,8 +62,10 @@ function Scene({
   showTrail,
   showSoilZones,
   showPlants,
+  showScanner,
   hour,
-  onSoilTypeChange
+  onSoilTypeChange,
+  onScanComplete
 }: SceneProps) {
   // Sample plants on the learning platform - one in each soil zone
   const platformPlants = useMemo(() => {
@@ -111,6 +120,16 @@ function Scene({
       <LearningPlatform size={3} showSoilZones={showSoilZones} />
       <ScaledCartesianCube />
       
+      {/* Robot scanner */}
+      {showScanner && (
+        <RobotScanner
+          robotPosition={robotPosition}
+          hour={hour}
+          autoScan={true}
+          onScanComplete={onScanComplete}
+        />
+      )}
+      
       {/* Robot and trail */}
       {showTrail && <ScaledRobotTrail position={robotPosition} cubeSize={2} />}
       <ScaledRobotModel 
@@ -155,9 +174,16 @@ export function EducationalRobotScene({
   const [currentSoilType, setCurrentSoilType] = useState<SoilType>('good');
   const [speedMultiplier, setSpeedMultiplier] = useState(1);
   const [showPlants, setShowPlants] = useState(true);
+  const [showScanner, setShowScanner] = useState(true);
+  const [lastScanResult, setLastScanResult] = useState<RobotScanResult | null>(null);
   
   // Time of day system
   const [hour, setHour] = useState(12); // 0-24
+  
+  // Handle scan completion
+  const handleScanComplete = useCallback((result: RobotScanResult) => {
+    setLastScanResult(result);
+  }, []);
 
   // Convert 0-255 coordinates to 0-1 for Three.js
   const robotPosition: [number, number, number] = [
@@ -255,7 +281,9 @@ export function EducationalRobotScene({
               showTrail={showTrail}
               showSoilZones={showSoilZones}
               showPlants={showPlants}
+              showScanner={showScanner}
               onSoilTypeChange={handleSoilTypeChange}
+              onScanComplete={handleScanComplete}
             />
           </Suspense>
         </Canvas>
@@ -306,6 +334,15 @@ export function EducationalRobotScene({
           >
             <Leaf className="h-4 w-4" />
             Plants
+          </Button>
+          <Button
+            variant={showScanner ? "default" : "outline"}
+            size="sm"
+            onClick={() => setShowScanner(!showScanner)}
+            className="gap-2 bg-background/80 backdrop-blur-sm"
+          >
+            <Radar className="h-4 w-4" />
+            Scanner
           </Button>
         </div>
 
@@ -546,6 +583,112 @@ export function EducationalRobotScene({
                   </span>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+        
+        {/* Scanner Results Panel */}
+        {showScanner && lastScanResult && (
+          <div className="absolute bottom-20 right-4 bg-background/90 backdrop-blur-sm rounded-lg px-4 py-3 text-xs w-72 border border-primary/30 shadow-lg">
+            <div className="flex items-center gap-2 mb-3">
+              <Radar className="h-4 w-4 text-primary animate-pulse" />
+              <span className="font-semibold text-foreground">Terrain Analysis</span>
+              <span className="ml-auto text-muted-foreground text-[10px]">
+                {new Date(lastScanResult.timestamp).toLocaleTimeString()}
+              </span>
+            </div>
+            
+            {/* Terrain Data Grid */}
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              <div className="bg-muted/50 rounded p-2">
+                <div className="text-muted-foreground text-[10px] mb-1">Soil Quality</div>
+                <div className="flex items-center gap-2">
+                  <div 
+                    className="w-3 h-3 rounded-full" 
+                    style={{ backgroundColor: SOIL_ZONES[lastScanResult.terrain.soilType].color }}
+                  />
+                  <span className="font-mono font-medium">{Math.round(lastScanResult.terrain.soilQuality * 100)}%</span>
+                </div>
+              </div>
+              <div className="bg-muted/50 rounded p-2">
+                <div className="text-muted-foreground text-[10px] mb-1">Elevation</div>
+                <span className="font-mono font-medium">{Math.round(lastScanResult.terrain.elevation * 100)}%</span>
+              </div>
+              <div className="bg-muted/50 rounded p-2">
+                <div className="text-muted-foreground text-[10px] mb-1">Sunlight</div>
+                <div className="flex items-center gap-1">
+                  <Sun className="h-3 w-3 text-amber-500" />
+                  <span className="font-mono font-medium">{Math.round(lastScanResult.terrain.sunlightExposure * 100)}%</span>
+                </div>
+              </div>
+              <div className="bg-muted/50 rounded p-2">
+                <div className="text-muted-foreground text-[10px] mb-1">Water Level</div>
+                <span className="font-mono font-medium">{Math.round(lastScanResult.terrain.waterLevel * 100)}%</span>
+              </div>
+            </div>
+            
+            {/* Plant Health Assessment */}
+            <div className="border-t border-border pt-2 mb-2">
+              <div className="flex items-center gap-2 mb-2">
+                <Activity className="h-3 w-3 text-emerald-500" />
+                <span className="text-muted-foreground">Plant Health Assessment</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div 
+                  className="w-8 h-8 rounded-full border-2 border-background shadow-sm flex items-center justify-center"
+                  style={{ backgroundColor: lastScanResult.plant.color.hex }}
+                >
+                  <span className="text-[9px] font-bold text-white drop-shadow-md">
+                    {Math.round(lastScanResult.plant.health * 100)}
+                  </span>
+                </div>
+                <div>
+                  <div className="font-medium capitalize text-foreground">{lastScanResult.plant.healthState}</div>
+                  <div className="text-muted-foreground text-[10px]">
+                    Growth potential: {Math.round(lastScanResult.plant.growthPotential * 100)}%
+                  </div>
+                </div>
+              </div>
+              
+              {/* RGB Values */}
+              <div className="flex gap-2 mt-2 text-[9px]">
+                <div className="flex items-center gap-1 bg-red-500/10 px-2 py-0.5 rounded">
+                  <div className="w-2 h-2 bg-red-500 rounded-full" />
+                  <span className="font-mono">{Math.round(lastScanResult.plant.color.r * 255)}</span>
+                </div>
+                <div className="flex items-center gap-1 bg-green-500/10 px-2 py-0.5 rounded">
+                  <div className="w-2 h-2 bg-green-500 rounded-full" />
+                  <span className="font-mono">{Math.round(lastScanResult.plant.color.g * 255)}</span>
+                </div>
+                <div className="flex items-center gap-1 bg-blue-500/10 px-2 py-0.5 rounded">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full" />
+                  <span className="font-mono">{Math.round(lastScanResult.plant.color.b * 255)}</span>
+                </div>
+              </div>
+            </div>
+            
+            {/* Stress Factors */}
+            {lastScanResult.plant.stressFactors.length > 0 && (
+              <div className="border-t border-border pt-2 mb-2">
+                <div className="text-muted-foreground text-[10px] mb-1">⚠️ Stress Factors</div>
+                <div className="flex flex-wrap gap-1">
+                  {lastScanResult.plant.stressFactors.map((factor, i) => (
+                    <span key={i} className="bg-amber-500/20 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded text-[9px]">
+                      {factor}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Recommendations */}
+            <div className="border-t border-border pt-2">
+              <div className="text-muted-foreground text-[10px] mb-1">💡 Recommendations</div>
+              <div className="space-y-1">
+                {lastScanResult.recommendations.slice(0, 2).map((rec, i) => (
+                  <div key={i} className="text-[10px] text-foreground">{rec}</div>
+                ))}
+              </div>
             </div>
           </div>
         )}
