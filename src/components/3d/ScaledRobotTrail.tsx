@@ -1,4 +1,4 @@
-import { useRef, useMemo } from 'react';
+import { useRef, useMemo, forwardRef, useImperativeHandle } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
@@ -8,15 +8,20 @@ interface ScaledRobotTrailProps {
   maxPoints?: number;
 }
 
-export function ScaledRobotTrail({ 
-  position, 
-  cubeSize = 2, 
-  maxPoints = 80 
-}: ScaledRobotTrailProps) {
+export const ScaledRobotTrail = forwardRef<THREE.Points, ScaledRobotTrailProps>(function ScaledRobotTrail(
+  { 
+    position, 
+    cubeSize = 2, 
+    maxPoints = 80 
+  }: ScaledRobotTrailProps,
+  ref
+) {
   const trailRef = useRef<THREE.Points>(null);
   const positionsRef = useRef<number[]>([]);
   const opacitiesRef = useRef<number[]>([]);
   const lastPositionRef = useRef<[number, number, number]>([...position]);
+
+  useImperativeHandle(ref, () => trailRef.current as THREE.Points);
 
   // Convert normalized position to world position
   const getWorldPosition = (pos: [number, number, number]): [number, number, number] => {
@@ -132,4 +137,4 @@ export function ScaledRobotTrail({
   });
 
   return <points ref={trailRef} geometry={geometry} material={material} />;
-}
+});

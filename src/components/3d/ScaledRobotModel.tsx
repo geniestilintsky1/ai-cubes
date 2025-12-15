@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback, useEffect } from 'react';
+import { useRef, useState, useCallback, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { getSoilTypeAtPosition, SOIL_ZONES, type SoilType } from './SoilZones';
@@ -12,19 +12,24 @@ interface ScaledRobotModelProps {
   onSoilTypeChange?: (soilType: SoilType, speedMultiplier: number) => void;
 }
 
-export function ScaledRobotModel({ 
-  position, 
-  onPositionChange, 
-  isWaving, 
-  isWalking,
-  cubeSize = 2,
-  onSoilTypeChange
-}: ScaledRobotModelProps) {
+export const ScaledRobotModel = forwardRef<THREE.Group, ScaledRobotModelProps>(function ScaledRobotModel(
+  { 
+    position, 
+    onPositionChange, 
+    isWaving, 
+    isWalking,
+    cubeSize = 2,
+    onSoilTypeChange
+  }: ScaledRobotModelProps,
+  ref
+) {
   const groupRef = useRef<THREE.Group>(null);
   const leftArmRef = useRef<THREE.Mesh>(null);
   const rightArmRef = useRef<THREE.Mesh>(null);
   const leftLegRef = useRef<THREE.Mesh>(null);
   const rightLegRef = useRef<THREE.Mesh>(null);
+  
+  useImperativeHandle(ref, () => groupRef.current as THREE.Group);
   
   const [isDragging, setIsDragging] = useState(false);
   const { camera, raycaster, pointer, gl } = useThree();
@@ -255,4 +260,4 @@ export function ScaledRobotModel({
       </mesh>
     </group>
   );
-}
+});
