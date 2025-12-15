@@ -235,7 +235,9 @@ export function EducationalRobotScene({
             toneMapping: 3, // ACESFilmicToneMapping
             toneMappingExposure: 1.2,
           }}
+          style={{ background: 'linear-gradient(to bottom, #87ceeb, #e0f2fe)' }}
         >
+          <color attach="background" args={['#87ceeb']} />
           <PerspectiveCamera 
             makeDefault 
             position={getCameraPosition()} 
