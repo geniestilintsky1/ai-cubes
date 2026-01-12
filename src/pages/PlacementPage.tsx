@@ -3,8 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Check, ArrowLeft, ArrowRight, Move3D } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Layout } from '@/components/Layout';
-import { EducationalRobotScene } from '@/components/EducationalRobotScene';
-import { AxisIndicator } from '@/components/AxisIndicator';
+import { MarkerGame } from '@/components/3d/MarkerGame';
 import { useSession } from '@/context/SessionContext';
 import { sendRobotCoordinates } from '@/lib/api';
 
@@ -51,26 +50,7 @@ const PlacementPage = () => {
 
           {/* 3D Scene */}
           <div className="rounded-2xl border border-border overflow-hidden bg-card shadow-lg mb-6">
-            <EducationalRobotScene
-              coordinates={state.robotCoordinates}
-              onCoordinatesChange={setRobotCoordinates}
-              className="w-full h-[500px] md:h-[600px]"
-            />
-          </div>
-
-          {/* Coordinates Display */}
-          <div className="flex justify-center mb-8">
-            <div className="inline-block p-4 rounded-xl bg-card border border-border shadow-sm">
-              <p className="text-sm text-muted-foreground text-center mb-3">
-                Current Position
-              </p>
-              <AxisIndicator
-                x={state.robotCoordinates.x}
-                y={state.robotCoordinates.y}
-                z={state.robotCoordinates.z}
-                size="lg"
-              />
-            </div>
+            <MarkerGame className="w-full h-[500px] md:h-[600px]" />
           </div>
 
           {/* Tips */}
