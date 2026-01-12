@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Check, ArrowLeft, ArrowRight, Move3D } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Layout } from '@/components/Layout';
-import { MarkerGame } from '@/components/3d/MarkerGame';
+import { RGBCoordinateLab, type RGBPosition } from '@/components/3d/RGBCoordinateLab';
 import { useSession } from '@/context/SessionContext';
 import { sendRobotCoordinates } from '@/lib/api';
 
@@ -15,6 +15,11 @@ const PlacementPage = () => {
   useEffect(() => {
     setCurrentStep('placement');
   }, [setCurrentStep]);
+
+  const handlePositionChange = useCallback((pos: RGBPosition) => {
+    // Map RGB position to robot coordinates (R→X, G→Y, B→Z for API compatibility)
+    setRobotCoordinates({ x: pos.r, y: pos.g, z: pos.b });
+  }, [setRobotCoordinates]);
 
   const handleConfirm = async () => {
     setIsSubmitting(true);
@@ -37,32 +42,44 @@ const PlacementPage = () => {
           <div className="text-center mb-8">
             <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4">
               <Move3D className="w-4 h-4" />
-              Step 1: Place the Robot
+              Step 1: Position in RGB Space
             </span>
             <h1 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-3">
-              Position RoboFarmer in 3D Space
+              RGB Coordinate Laboratory
             </h1>
             <p className="text-muted-foreground max-w-xl mx-auto">
-              Drag the robot to any position inside the cube. The X, Y, Z coordinates 
-              will be used to calculate the RGB color.
+              Position the marker in 3D space. X-axis = Red, Z-axis = Green, Y-axis (height) = Blue. 
+              Your spatial position determines the RGB color value.
             </p>
           </div>
 
           {/* 3D Scene */}
           <div className="rounded-2xl border border-border overflow-hidden bg-card shadow-lg mb-6">
-            <MarkerGame className="w-full h-[500px] md:h-[600px]" />
+            <RGBCoordinateLab 
+              className="w-full h-[500px] md:h-[600px]" 
+              onPositionChange={handlePositionChange}
+              initialPosition={{ 
+                r: state.robotCoordinates.x, 
+                g: state.robotCoordinates.y, 
+                b: state.robotCoordinates.z 
+              }}
+              showOctopuses={true}
+            />
           </div>
 
-          {/* Tips */}
+          {/* RGB Mapping Guide */}
           <div className="grid md:grid-cols-3 gap-4 mb-8">
             {[
-              { label: 'Drag', desc: 'Click and drag the robot to move it horizontally' },
-              { label: 'Orbit', desc: 'Click and drag the background to rotate the view' },
-              { label: 'Zoom', desc: 'Use scroll wheel to zoom in and out' },
-            ].map(({ label, desc }, i) => (
-              <div key={i} className="p-4 rounded-lg bg-secondary/50 text-center">
-                <p className="font-medium text-foreground">{label}</p>
-                <p className="text-sm text-muted-foreground">{desc}</p>
+              { color: 'bg-red-500', label: 'X-Axis → Red (R)', desc: 'Horizontal position left-right' },
+              { color: 'bg-green-500', label: 'Z-Axis → Green (G)', desc: 'Horizontal position front-back' },
+              { color: 'bg-blue-500', label: 'Y-Axis → Blue (B)', desc: 'Vertical height (use slider)' },
+            ].map(({ color, label, desc }, i) => (
+              <div key={i} className="p-4 rounded-lg bg-secondary/50 flex items-start gap-3">
+                <div className={`w-4 h-4 rounded-sm ${color} mt-0.5`} />
+                <div>
+                  <p className="font-medium text-foreground">{label}</p>
+                  <p className="text-sm text-muted-foreground">{desc}</p>
+                </div>
               </div>
             ))}
           </div>
@@ -85,7 +102,7 @@ const PlacementPage = () => {
               ) : (
                 <>
                   <Check className="w-4 h-4 mr-2" />
-                  Confirm Placement
+                  Confirm Position
                   <ArrowRight className="w-4 h-4 ml-2" />
                 </>
               )}
